@@ -85,3 +85,80 @@ def test_math():
         b.backward()
         assert abs(b.data - np.cos(theta)) < 1e-6
         assert abs(a.grad + np.sin(theta)) < 1e-6
+
+def test_array():
+    # Scalar addition
+    x = mg.Array([1, 2, 3])
+    z = x + 1
+    z.backward()
+    assert abs(z.data - (x.data + 1)).sum() < 1e-6
+    assert abs(x.grad - np.array([1, 1, 1])).sum() < 1e-6
+
+    # Array addition
+    x = mg.Array([1, 2, 3])
+    y = mg.Array([4, 5, 6])
+    z = x + y
+    z.backward()
+    assert abs(z.data - (x.data + y.data)).sum() < 1e-6
+    assert abs(x.grad - np.array([1, 1, 1])).sum() < 1e-6
+    assert abs(y.grad - np.array([1, 1, 1])).sum() < 1e-6
+
+    # Scalar multiplication
+    x = mg.Array([1, 2, 3])
+    z = x * 2
+    z.backward()
+    assert abs(z.data - x.data * 2).sum() < 1e-6
+    assert abs(x.grad - np.array([2, 2, 2])).sum() < 1e-6
+
+    # Array multiplication
+    x = mg.Array([1, 2, 3])
+    y = mg.Array([4, 5, 6])
+    z = x * y
+    z.backward()
+    assert abs(z.data - (x.data * y.data)).sum() < 1e-6
+    assert abs(x.grad - y.data).sum() < 1e-6
+    assert abs(y.grad - x.data).sum() < 1e-6
+
+    # Scalar division
+    x = mg.Array([1, 2, 3])
+    z = x / 2.0
+    z.backward()
+    assert abs(z.data - x.data / 2.0).sum() < 1e-6
+    assert abs(x.grad - np.array([0.5, 0.5, 0.5])).sum() < 1e-6
+
+    # Array division
+    x = mg.Array([1, 2, 3])
+    y = mg.Array([4, 5, 6])
+    z = x / y
+    z.backward()
+    assert abs(z.data - (x.data / y.data)).sum() < 1e-6
+    assert abs(x.grad - 1/y.data).sum() < 1e-6
+    assert abs(y.grad - (-x.data/y.data**2)).sum() < 1e-6
+
+    # Power
+    x = mg.Array([1, 2, 3])
+    z = x**2
+    z.backward()
+    assert abs(z.data - x.data**2).sum() < 1e-6
+    assert abs(x.grad - 2*x.data).sum() < 1e-6
+
+    # Inverse 
+    x = mg.Array([1, 2, 3])
+    z = x**-1
+    z.backward()
+    assert abs(z.data - x.data**-1).sum() < 1e-6
+    assert abs(x.grad - (-1*x.data**-2)).sum() < 1e-6
+
+    # Sine
+    x = mg.Array([0, np.pi/4, np.pi/3, np.pi/2])
+    z = mg.sin(x)
+    z.backward()
+    assert abs(z.data - np.sin(x.data)).sum() < 1e-6
+    assert abs(x.grad - np.cos(x.data)).sum() < 1e-6
+
+    # Cosine
+    x = mg.Array([0, np.pi/4, np.pi/3, np.pi/2])
+    z = mg.cos(x)
+    z.backward()
+    assert abs(z.data - np.cos(x.data)).sum() < 1e-6
+    assert abs(x.grad + np.sin(x.data)).sum() < 1e-6
