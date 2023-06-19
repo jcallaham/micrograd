@@ -17,7 +17,7 @@ class Array:
         out = Array(self.data + _other.data, (self, _other), '+')
 
         def _backward():
-            self.grad += out.grad
+            self.grad = self.grad + out.grad
             if other_is_array:
                 other.grad += out.grad
         out._backward = _backward
@@ -79,7 +79,7 @@ class Array:
     def __repr__(self):
         return f"Array(data={self.data}, grad={self.grad})"
     
-    def backward(self, debug=False):
+    def backward(self, gradient=None, debug=False):
         # topological order all of the children in the graph
         topo = []
         visited = set()
@@ -92,8 +92,12 @@ class Array:
                 topo.append(v)
         build_topo(self)
 
+        if gradient is None:
+            assert self.data.shape == (), "must pass a gradient for non-scalar arrays"
+            gradient = np.array(1.0)
+        self.grad = gradient
+
         # go one variable at a time and apply the chain rule to get its gradient
-        self.grad = np.ones_like(self.data)
         for v in reversed(topo):
             v._backward()
 
