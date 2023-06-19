@@ -1,54 +1,90 @@
 import numpy as np
+from functools import singledispatch
+from typing import Union
 
-class Scalar:
-    """ stores a single scalar value and its gradient """
-
+# Array version of original micrograd.Value
+class Array:
     def __init__(self, data, _children=(), _op=''):
-        self.data = data
-        self.grad = 0
-        # internal variables used for autograd graph construction
+        self.data = np.array(data, dtype=np.float64)
+        self.grad = np.zeros_like(data, dtype=np.float64)
         self._backward = lambda: None
         self._prev = set(_children)
-        self._op = _op # the op that produced this node, for graphviz / debugging / etc
+        self._op = _op
 
     def __add__(self, other):
-        other = other if isinstance(other, type(self)) else Scalar(other)
-        out = Scalar(self.data + other.data, (self, other), '+')
+        other_is_array = isinstance(other, type(self))
+        _other = other if other_is_array else Array(other)
+        out = Array(self.data + _other.data, (self, _other), '+')
 
         def _backward():
-            self.grad += out.grad
-            other.grad += out.grad
+            self.grad = self.grad + out.grad
+            if other_is_array:
+                other.grad += out.grad
         out._backward = _backward
 
         return out
-
+    
     def __mul__(self, other):
-        other = other if isinstance(other, type(self)) else Scalar(other)
-        out = Scalar(self.data * other.data, (self, other), '*')
+        other_is_array = isinstance(other, type(self))
+        _other = other if other_is_array else Array(other)
+        out = Array(self.data * _other.data, (self, _other), '*')
 
         def _backward():
-            self.grad += other.data * out.grad
-            other.grad += self.data * out.grad
+            self.grad += _other.data * out.grad
+            if other_is_array:
+                other.grad += self.data * out.grad
         out._backward = _backward
 
         return out
-
+    
     def __pow__(self, other):
         assert isinstance(other, (int, float)), "only supporting int/float powers for now"
-        out = Scalar(self.data**other, (self,), f'**{other}')
+        out = Array(self.data**other, (self,), f'**{other}')
 
         def _backward():
             self.grad += (other * self.data**(other-1)) * out.grad
         out._backward = _backward
 
         return out
+    
+    def __neg__(self):
+        return self * -1
+    
+    def __radd__(self, other):
+        return self + other
+    
+    def __sub__(self, other):
+        return self + (-other)
+    
+    def __rsub__(self, other):
+        return other + (-self)
+    
+    def __rmul__(self, other):
+        return self * other
+    
+    def __truediv__(self, other):
+        return self * other**-1
+    
+    def __rtruediv__(self, other):
+        return other * self**-1
+    
+    def __getitem__(self, idx):
+        out = Array(self.data[idx], (self,), f'getitem[{idx}]')
+        def _backward():
+            self.grad[idx] += out.grad
+        out._backward = _backward
 
-    def backward(self):
+        return out
+    
+    def __repr__(self):
+        return f"Array(data={self.data}, grad={self.grad})"
+    
+    def backward(self, gradient=None, debug=False):
         # topological order all of the children in the graph
         topo = []
         visited = set()
         def build_topo(v):
-            v.grad = 0
+            v.grad = np.zeros_like(v.data)
             if v not in visited:
                 visited.add(v)
                 for child in v._prev:
@@ -56,56 +92,37 @@ class Scalar:
                 topo.append(v)
         build_topo(self)
 
+        if gradient is None:
+            assert self.data.shape == (), "must pass a gradient for non-scalar arrays"
+            gradient = np.array(1.0)
+        self.grad = gradient
+
         # go one variable at a time and apply the chain rule to get its gradient
-        self.grad = 1
         for v in reversed(topo):
             v._backward()
 
-    def __neg__(self): # -self
-        return self * -1
+@singledispatch
+def array(x):
+    return Array(x)
 
-    def __radd__(self, other): # other + self
-        return self + other
+@array.register
+def _(x: Array):
+    return x
 
-    def __sub__(self, other): # self - other
-        return self + (-other)
-
-    def __rsub__(self, other): # other - self
-        return other + (-self)
-
-    def __rmul__(self, other): # other * self
-        return self * other
-
-    def __truediv__(self, other): # self / other
-        return self * other**-1
-
-    def __rtruediv__(self, other): # other / self
-        return other * self**-1
-
-    def __repr__(self):
-        return f"Scalar(data={self.data}, grad={self.grad})"
-
-def sin(x):
-    out = Scalar(np.sin(x.data), (x,), 'sin')
-
+@array.register
+def _(x: Union[list, tuple]):
+    # Create new Arrays for elements that aren't already Arrays (existing Arrays won't change)
+    _x = [array(xi) for xi in x]  
+    out = Array([xi.data for xi in _x], _x, f'array({x})')
     def _backward():
-        x.grad += np.cos(x.data) * out.grad
+        for i in range(len(x)):
+            _x[i].grad += out.grad[i]
     out._backward = _backward
-
     return out
 
-def cos(x):
-    out = Scalar(np.cos(x.data), (x,), 'cos')
 
-    def _backward():
-        x.grad += -np.sin(x.data) * out.grad
-    out._backward = _backward
-
-    return out
 
 
 # TODO:
-# - add Array container for list of Scalars
-# - add "overloaded functions" for sin, cos, exp, log, etc
 # - add support for matrix multiplication?
 # - add forward mode AD
