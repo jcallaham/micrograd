@@ -209,3 +209,23 @@ class TestArray:
         J.backward()
         assert abs(x.grad - np.array([2*c**2])).sum() < 1e-6
 
+    def test_transpose(self):
+        x = mg.array([[1, 2, 3], [4, 5, 6]])
+        z = x.T
+
+        assert abs(z.data - x.data.T).sum() < 1e-6
+
+        def e(i, j):
+            _e = np.zeros_like(z.data)
+            _e[i, j] = 1.0
+            return _e
+
+        for i in range(x.shape[0]):
+            for j in range(x.shape[1]):
+                x.grad *= 0.0
+                seed = e(j, i)
+                z.backward(seed)
+                assert abs(x.grad - seed.T).sum() < 1e-6
+
+    
+
