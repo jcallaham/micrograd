@@ -69,41 +69,57 @@ def test_more_ops():
     assert abs(bmg.grad - bpt.grad.item()) < tol
 
 
-def test_math():
-    for theta in [0.0, np.pi/4, np.pi/3, np.pi/2]:
-        # Sine
-        a = mg.array(theta)
-        b = mg.sin(a)
-        b.backward()
-        assert abs(b.data - np.sin(a.data)).sum() < 1e-6
-        assert abs(a.grad - np.cos(a.data)).sum() < 1e-6
+class TestMath:
+    def test_trig(self):
+        for theta in [0.0, np.pi/4, np.pi/3, np.pi/2]:
+            # Sine
+            a = mg.array(theta)
+            b = mg.sin(a)
+            b.backward()
+            assert abs(b.data - np.sin(a.data)).sum() < 1e-6
+            assert abs(a.grad - np.cos(a.data)).sum() < 1e-6
 
-        # Cosine
-        a = mg.array(theta)
-        b = mg.cos(a)
-        b.backward()
-        assert abs(b.data - np.cos(a.data)).sum() < 1e-6
-        assert abs(a.grad + np.sin(a.data)).sum() < 1e-6
+            # Cosine
+            a = mg.array(theta)
+            b = mg.cos(a)
+            b.backward()
+            assert abs(b.data - np.cos(a.data)).sum() < 1e-6
+            assert abs(a.grad + np.sin(a.data)).sum() < 1e-6
 
-    # ReLU
-    for x in [-1.0, 0.0, 1.0]:
-        a = mg.array(x)
-        b = mg.relu(a)
-        b.backward()
-        print(x, b.data)
-        true_val = x if x > 0.0 else 0.0
-        true_grad = 1.0 if x > 0.0 else 0.0
-        assert abs(b.data - true_val).sum() < 1e-6
-        assert abs(a.grad - true_grad).sum() < 1e-6
+            # Tangent
+            a = mg.array(theta)
+            b = mg.tan(a)
+            b.backward()
+            assert abs(b.data - np.tan(a.data)).sum() < 1e-6
+            assert abs(a.grad - (1 / np.cos(a.data)**2)).sum() < 1e-6
 
-    # Dot product
-    a = mg.array([1.0, 2.0, 3.0])
-    b = mg.array([4.0, 5.0, 6.0])
-    c = mg.dot(a, b)
-    c.backward()
-    assert abs(c.data - np.dot(a.data, b.data)).sum() < 1e-6
-    assert abs(a.grad - b.data).sum() < 1e-6
-    assert abs(b.grad - a.data).sum() < 1e-6
+    def test_activations(self):
+        for x in np.linspace(-1.0, 1.0, 10):
+             # ReLU
+            a = mg.array(x)
+            b = mg.relu(a)
+            b.backward()
+            true_val = x if x > 0.0 else 0.0
+            true_grad = 1.0 if x > 0.0 else 0.0
+            assert abs(b.data - true_val).sum() < 1e-6
+            assert abs(a.grad - true_grad).sum() < 1e-6
+
+            # Tanh
+            a = mg.array(x)
+            b = mg.tanh(a)
+            b.backward()
+            assert abs(b.data - np.tanh(a.data)).sum() < 1e-6
+            assert abs(a.grad - (1 - b.data**2)).sum() < 1e-6
+
+    def test_linalg(self):
+        # Dot product
+        a = mg.array([1.0, 2.0, 3.0])
+        b = mg.array([4.0, 5.0, 6.0])
+        c = mg.dot(a, b)
+        c.backward()
+        assert abs(c.data - np.dot(a.data, b.data)).sum() < 1e-6
+        assert abs(a.grad - b.data).sum() < 1e-6
+        assert abs(b.grad - a.data).sum() < 1e-6
 
 class TestArray:
     def test_addition(self):
