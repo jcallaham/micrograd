@@ -47,6 +47,38 @@ class Array:
 
         return out
     
+    @property
+    def shape(self):
+        return self.data.shape
+
+    @property
+    def T(self):
+        out = Array(self.data.T, (self,), 'T')
+
+        def _backward():
+            self.grad += out.grad.T
+        out._backward = _backward
+
+        return out
+    
+    def __matmul__(self, other):
+        out = Array(self.data @ other.data, (self, other), '@')
+
+        def _backward():
+            _out_grad = out.grad.reshape(-1, 1) if out.grad.ndim == 1 else out.grad
+            _self_data = self.data.reshape(-1, 1) if self.data.ndim == 1 else self.data
+            _other_data = other.data.reshape(-1, 1) if other.data.ndim == 1 else other.data
+        
+            _self_grad = _out_grad @ _other_data.T  # V @ X.T
+            _other_grad = _self_data.T @ _out_grad  # A.T @ V
+
+            self.grad += _self_grad.reshape(self.grad.shape)
+            other.grad += _other_grad.reshape(other.grad.shape)
+
+        out._backward = _backward
+
+        return out
+    
     def __neg__(self):
         return self * -1
     
@@ -76,15 +108,23 @@ class Array:
 
         return out
     
+    def __setitem__(self, idx, value):
+        raise NotImplementedError("In-place operations on arrays are not supported")
+    
     def __repr__(self):
         return f"Array(data={self.data}, grad={self.grad})"
     
-    def backward(self, gradient=None, debug=False):
+    def zero_grad(self):
+        self.grad *= 0.0
+        for child in self._prev:
+            child.zero_grad()
+    
+    def backward(self, gradient=None):
         # topological order all of the children in the graph
         topo = []
         visited = set()
         def build_topo(v):
-            v.grad = np.zeros_like(v.data)
+            v.zero_grad()
             if v not in visited:
                 visited.add(v)
                 for child in v._prev:
@@ -94,8 +134,8 @@ class Array:
 
         if gradient is None:
             assert self.data.shape == (), "must pass a gradient for non-scalar arrays"
-            gradient = np.array(1.0)
-        self.grad = gradient
+            gradient = 1.0
+        self.grad = np.array(gradient)
 
         # go one variable at a time and apply the chain rule to get its gradient
         for v in reversed(topo):
@@ -109,20 +149,30 @@ def array(x):
 def _(x: Array):
     return x
 
-@array.register
-def _(x: Union[list, tuple]):
+def _array_iter(x: Union[list, tuple]):
     # Create new Arrays for elements that aren't already Arrays (existing Arrays won't change)
     _x = [array(xi) for xi in x]  
     out = Array([xi.data for xi in _x], _x, f'array({x})')
+
+    # The Array creation should be a differentiable operation with respect to `x`
     def _backward():
         for i in range(len(x)):
             _x[i].grad += out.grad[i]
+            
     out._backward = _backward
     return out
+
+
+@array.register
+def _(x: list):
+    return _array_iter(x)
+
+@array.register
+def _(x: tuple):
+    return _array_iter(x)
 
 
 
 
 # TODO:
-# - add support for matrix multiplication?
 # - add forward mode AD
