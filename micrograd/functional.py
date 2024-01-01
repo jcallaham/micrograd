@@ -21,23 +21,23 @@ def grad(f):
 def jac(f):
     """Jacobian of a vector-valued function"""
     def _jac(*args, **kwargs):
-        assert len(args) == 1 and isinstance(args[0], Array)
+        assert len(args) == 1 and isinstance(args[0], Array), "Only single-input functions supported"
         x = args[0]
 
         y = f(*args, **kwargs) # forward pass (return an array)
-        assert isinstance(y, Array)
+        assert isinstance(y, Array), "Only single-output functions supported"
 
         J = np.zeros((len(y.data), len(x.data)))
-        for i in range(len(y.data)):
+        for k in range(len(y.data)):
             # For each output, do a backward pass
-            gradient = np.zeros_like(y.data)
-            gradient[i] = 1.0
 
-            for x in args:
-                x.grad = 0.0
+            e = np.zeros_like(y.data)
+            e[k] = 1.0  # Unit basis vector 
 
-            y.backward(gradient=gradient)
-            J[i] = x.grad
+            y.zero_grad()  # Reset the gradients to do a new backwards pass
+
+            y.backward(gradient=e)  # Seed the backwards pass with the basis vector
+            J[k, :] = x.grad
         return J
-    _jac.__name__ = f"grad({f.__name__})"
+    _jac.__name__ = f"jac({f.__name__})"
     return _jac

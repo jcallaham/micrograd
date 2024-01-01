@@ -10,6 +10,14 @@ def relu(x):
 
     return out
 
+def tanh(x):
+    out = Array(np.tanh(x.data), (x,), 'tanh')
+
+    def _backward():
+        x.grad += (1 - out.data**2) * out.grad
+    out._backward = _backward
+
+    return out
 
 def sin(x):
     out = Array(np.sin(x.data), (x,), 'sin')
@@ -25,6 +33,33 @@ def cos(x):
 
     def _backward():
         x.grad += -np.sin(x.data) * out.grad
+    out._backward = _backward
+
+    return out
+
+def tan(x):
+    out = Array(np.tan(x.data), (x,), 'tan')
+
+    def _backward():
+        x.grad += (1 / np.cos(x.data)**2) * out.grad
+    out._backward = _backward
+
+    return out
+
+def exp(x):
+    out = Array(np.exp(x.data), (x,), 'exp')
+
+    def _backward():
+        x.grad += np.exp(x.data) * out.grad
+    out._backward = _backward
+
+    return out
+
+def log(x):
+    out = Array(np.log(x.data), (x,), 'log')
+
+    def _backward():
+        x.grad += (1 / x.data) * out.grad
     out._backward = _backward
 
     return out
