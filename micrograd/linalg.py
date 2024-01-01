@@ -1,3 +1,10 @@
+"""A handful of linear algebra functions implemented in Micrograd.
+
+This isn't intended to be comprehensive in any way - these are the examples
+corresponding to the blog post on deriving custom autodiff rules.
+<BLOG URL>
+"""
+
 import numpy as np
 from scipy import linalg as scipy_linalg
 from scipy import sparse as scipy_sparse
